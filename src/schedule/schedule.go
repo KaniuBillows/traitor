@@ -2,24 +2,138 @@ package schedule
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"github.com/dop251/goja"
+	"github.com/gorhill/cronexpr"
+	"io"
+	"sync"
 	"time"
-	"traitor/job"
+	"traitor/dao"
+	"traitor/dao/model"
+	"traitor/js_exec"
+	"traitor/js_exec/debug_out"
+	"traitor/logger"
 )
 
+// Schedule just exec the job and notify other nodes.
 type Schedule interface {
 	Close()
 	Start(ctx context.Context)
-	AddJob(j job.Job) error
-	CancelJob(key string, jobType int) error
-	//UpdateTask()
+	//HandleJobStateChange
+	//handle enable or disable a job.
+	HandleJobStateChange(key string, state uint8)
+	//HandleJobTimeChange
+	// handle cron or delay change.
+	HandleJobTimeChange(key string)
+	CreateTask(key string, execType uint8) func()
+	CreateTaskForDebug(key string, writer io.Writer) (func(), *sync.WaitGroup)
+}
+type schedule struct {
+	dao       dao.Dao
+	timeWheel *timeWheel
 }
 
-const (
-	Standalone = 0
-	MultiNodes = 1
-)
+func (s *schedule) CreateTask(key string, execType uint8) func() {
 
-// return the delay time of the cron. todo: impl this method.
-func resolveCron(str string) time.Duration {
-	return 0
+	execFunc := func() {
+		vm := goja.New()        // the vm is not concurrent safe.
+		js_exec.LoadModules(vm) // native modules support.
+		var sc, err = s.dao.GetJobScript(key)
+		if err != nil {
+			logger.Error(fmt.Sprintf("running Task failed:%s download script error.", key))
+			return
+		}
+		_, err = vm.RunString(sc.Script) // running logic.
+		if err != nil {
+			logger.Error(err)
+		}
+	}
+	if execType == model.DelayExecute { // only once for delay.
+		return execFunc
+	} else {
+		return func() {
+			execFunc()
+			// after execute re-add into for next time.
+			j, err := s.dao.GetJobInfo(key)
+			if err != nil {
+				logger.Error(fmt.Sprintf("re-add timing job error, cannot get the job entity:%s", key))
+				return
+			}
+			err = s.addJob(&j)
+			if err != nil {
+				logger.Error(fmt.Sprintf("re-add timing job error:  %s", err.Error()))
+			}
+		}
+	}
+}
+func (s *schedule) addJob(j *model.JobEntity) error {
+	fn := s.CreateTask(j.JobId, j.ExecType)
+	if j.ExecType == model.TimingExecute {
+		d, err := resolveCron(j.Cron)
+		if err != nil {
+			return err
+		}
+		s.timeWheel.AddJob(d, j.JobId, fn)
+	} else {
+		delay := j.ExecAt.Sub(time.Now())
+		if delay <= 0 {
+			return errors.New("delay job has expired")
+		}
+		s.timeWheel.AddJob(delay, j.JobId, fn)
+	}
+	return nil
+}
+
+func (s *schedule) CreateTaskForDebug(key string, writer io.Writer) (func(), *sync.WaitGroup) {
+	wt := sync.WaitGroup{}
+	wt.Add(1)
+	return func() {
+		defer func() {
+			wt.Done()
+		}()
+		vm := goja.New()
+		js_exec.LoadModulesForDebugMode(vm)
+		debug_out.SetIoWriter(vm, writer) // this vm would use this writer.
+		var sc, err = s.dao.GetJobScript(key)
+		if err != nil {
+			logger.Error(fmt.Sprintf("running Task failed:%s download script error.", key))
+			return
+		}
+		_, err = vm.RunString(sc.Script) // running logic.
+		if err != nil {
+			errInfo := err.Error()
+			buffer := []byte(errInfo)
+			_, err = writer.Write(buffer)
+			if err != nil {
+				logger.Error(err)
+			}
+		}
+	}, &wt
+}
+
+// return the delay time of the cron.
+func resolveCron(str string) (time.Duration, error) {
+	t := cronexpr.MustParse(str).Next(time.Now())
+	if t.IsZero() == true {
+		return time.Second * 0, errors.New("never get next time")
+	}
+	return t.Sub(time.Now()), nil
+}
+
+func StartMultiNode(redisStr string, mongoUri string, cluster string) (Schedule, dao.Dao) {
+	d := dao.CreateMongoDao(mongoUri)
+	schedule := makeMultiNode(redisStr, d, cluster)
+	ctx := context.Background()
+	schedule.Start(ctx)
+
+	return schedule, d
+}
+
+func StartStandalone() (Schedule, dao.Dao) {
+	d := dao.CreateLocalDao()
+	schedule := makeStandalone(d)
+	ctx := context.Background()
+	schedule.Start(ctx)
+	return schedule, d
 }

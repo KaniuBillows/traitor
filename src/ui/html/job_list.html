@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Job List</title>
+</head>
+<body>
+<div class="container" style="display: flex;flex-direction: column">
+    <div aria-label="Basic outlined example" class="btn-group" role="group" style="align-self: end">
+        <button class="btn btn-outline-primary" data-bs-target="#editModal" data-bs-toggle="modal" type="button">
+            Create
+        </button>
+        <button class="btn btn-outline-danger" type="button">Remove</button>
+    </div>
+    <div class="row">
+        <table id="table"></table>
+    </div>
+</div>
+<!-- Modal -->
+<div aria-hidden="true" aria-labelledby="exampleModalLabel" class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="exampleModalLabel">Edit Job</h1>
+                <button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
+            </div>
+            <div class="modal-body">
+                <input class="form-control" hidden id="jobIdInput">
+                <div class="mb-3">
+                    <label class="form-label" for="jobNameInput">Job Name</label>
+                    <input class="form-control" id="jobNameInput"
+                           required type="text">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="descriptionInput">Description</label>
+                    <textarea class="form-control" id="descriptionInput" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="cronInput">Cron Expression</label>
+                    <input class="form-control" id="cronInput" oninput="cronCheck()">
+                    <div class="invalid-feedback" hidden id="validCron">
+                        Please provide a valid Cron Expression.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Close</button>
+                <button class="btn btn-primary" onclick="save()" type="button">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="../js/job_list.js"></script>
+</body>
+
+
+</html>
+
+

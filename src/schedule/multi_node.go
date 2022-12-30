@@ -9,28 +9,28 @@ import (
 	"time"
 	"traitor/consistenthash"
 	"traitor/dao"
-	"traitor/job"
+	"traitor/dao/model"
 	"traitor/logger"
 )
 
 const (
-	nodeId           = "traitor_defaultNode_" //todo: with config.
-	heartBeatTimeout = 1                      //doesn't update node's status within 5s,indicating that this node is down. todo: with config.
+	nodeId           = "traitor_defaultNode_"
+	heartBeatTimeout = 1 //doesn't update node's status within 5s,indicating that this node is down. todo: with config.
 	replicaCount     = 50
 	redisChannel     = "traitor_pub_sub"
 )
 
 type MultiNodeSchedule struct {
-	timeWheel     *timeWheel
+	schedule
 	client        *redis.Client
 	NodeId        string
 	cancel        context.CancelFunc
 	consistentMap *consistenthash.Map
-	dao           dao.Dao
+	cluster       string
 }
 
-func MakeMultiNode(connectionStr string) Schedule {
-	opt, err := redis.ParseURL(connectionStr)
+func makeMultiNode(redisStr string, d dao.Dao, cluster string) *MultiNodeSchedule {
+	opt, err := redis.ParseURL(redisStr)
 	if err != nil {
 		panic(err)
 	}
@@ -40,12 +40,14 @@ func MakeMultiNode(connectionStr string) Schedule {
 	}
 	uid := uuid.New()
 	s := &MultiNodeSchedule{
-		timeWheel: makeTimeWheel(),
-		client:    client,
-		NodeId:    nodeId + uid.String(),
+		schedule: schedule{timeWheel: makeTimeWheel(), dao: d},
+		client:   client,
+		NodeId:   nodeId + cluster + uid.String(),
+		cluster:  cluster,
 	}
 	return s
 }
+
 func (s *MultiNodeSchedule) Close() {
 	s.timeWheel.stop()
 	_ = s.client.Close()
@@ -57,17 +59,31 @@ func (s *MultiNodeSchedule) Close() {
 
 func (s *MultiNodeSchedule) Start(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
+
 	s.cancel = cancel
 
 	s.startHeartBeat(ctx)
 	s.startSyncNodeList(ctx)
+	s.initJobs()
 	s.startSub(ctx)
 	s.timeWheel.start()
 }
+
+// load jobs from db.
+func (s *MultiNodeSchedule) initJobs() {
+	jbs, err := s.dao.GetRunnableJobs()
+	if err != nil {
+		panic(err)
+	}
+	for _, jb := range jbs {
+		_ = s.addJob(&jb)
+	}
+}
+
 func (s *MultiNodeSchedule) syncNodeList(ctx context.Context) {
 	var cursor uint64 = 0
 	list := make([]string, 0)
-	matchStr := fmt.Sprintf("%s*", nodeId)
+	matchStr := fmt.Sprintf("%s*", nodeId+s.cluster)
 	for {
 		scan := s.client.Scan(ctx, cursor, matchStr, 1000)
 		keys, cursor, err := scan.Result()
@@ -126,46 +142,70 @@ func (s *MultiNodeSchedule) startHeartBeat(ctx context.Context) {
 	}()
 }
 
-func (s *MultiNodeSchedule) AddJob(j job.Job) error {
-
-	// if js job
-	// publish job id to redis for notify other nodes.
-	// If the job has already been in the timeWheel, it should be re-added.
-	if j.JobType == job.JavaScriptJob {
-		s.timeWheel.AddJob(resolveCron(j.CronExpression), j.JobId, j.Function)
-		//notify other nodes.
-		res := s.client.Publish(context.TODO(), redisChannel, fmt.Sprintf(jobAdd, j.JobId))
-		if res.Err() != nil {
-			return res.Err()
-		}
-		return nil
+func (s *MultiNodeSchedule) handleAddJob(j *model.JobEntity) error {
+	err := s.addJob(j)
+	if err != nil {
+		return err
 	}
-
-	// if it is go job:
-	if j.JobType == job.GolangJob {
-		delay := resolveCron(j.CronExpression)
-
-		s.timeWheel.AddJob(delay*time.Second, j.JobId, j.Function)
+	err = s.notifyOtherNodes(fmt.Sprintf(jobAdd, j.JobId))
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
-// CancelJob remove the job from the time wheel.
-func (s *MultiNodeSchedule) CancelJob(key string, jobType int) error {
-	// if js job
-	if jobType == job.JavaScriptJob {
-		// notify other nodes.
-		res := s.client.Publish(context.TODO(), redisChannel, fmt.Sprintf(jobCancel, key))
-		if res.Err() != nil {
-			return res.Err()
+func (s *MultiNodeSchedule) notifyOtherNodes(content string) error {
+	//notify other nodes.
+	res := s.client.Publish(context.TODO(), redisChannel, content)
+	if res.Err() != nil {
+		return res.Err()
+	}
+	return nil
+}
+
+func (s *MultiNodeSchedule) HandleJobStateChange(key string, state uint8) {
+	if state == model.Runnable {
+		job, err := s.dao.GetJobInfo(key)
+		if err != nil {
+			logger.Error(err)
+			return
 		}
-		s.timeWheel.removeTask(key)
-		return nil
+		err = s.handleAddJob(&job)
+		if err != nil {
+			logger.Error(err)
+			return
+		}
+	} else {
+		err := s.cancelJob(key)
+		if err != nil {
+			logger.Error(err)
+			return
+		}
 	}
-	// if golang job:
-	if jobType == job.GolangJob {
-		s.timeWheel.removeTask(key)
+}
+
+func (s *MultiNodeSchedule) CreateTask(key string, execType uint8) func() {
+	fn := s.schedule.CreateTask(key, execType)
+	return func() {
+		if s.executable(key) {
+			fn()
+		}
+		return
 	}
+}
+
+func (s *MultiNodeSchedule) executable(key string) bool {
+	return s.consistentMap.Get(key) == s.NodeId
+}
+
+// cancelJob remove the job from the time wheel.
+func (s *MultiNodeSchedule) cancelJob(key string) error {
+	// notify other nodes.
+	err := s.notifyOtherNodes(fmt.Sprintf(jobCancel, key))
+	if err != nil {
+		return err
+	}
+	s.timeWheel.removeJob(key) // remove local job.
 	return nil
 }
 
@@ -196,8 +236,10 @@ func (s *MultiNodeSchedule) handleSubEvent(msg *redis.Message) {
 		if err != nil {
 			logger.Error(fmt.Sprintf("could not load the job from db.id:%s", id))
 		}
-		task := job.CreateWithEntity(entity)
-		s.timeWheel.AddJob(resolveCron(task.CronExpression), task.JobId, task.Function)
+		err = s.addJob(&entity)
+		if err != nil {
+			logger.Error(fmt.Sprintf("handle sub jobAdd event error:%s", err.Error()))
+		}
 		return
 	}
 
@@ -205,7 +247,24 @@ func (s *MultiNodeSchedule) handleSubEvent(msg *redis.Message) {
 	if strings.Contains(msg.Payload, "jobCancel") {
 		res := strings.Split(msg.Payload, ":")
 		id := res[1]
-		s.timeWheel.removeTask(id)
+		s.timeWheel.removeJob(id)
 		return
+	}
+}
+
+func (s *MultiNodeSchedule) HandleJobTimeChange(key string) {
+	jb, err := s.dao.GetJobInfo(key)
+	if err == nil {
+		err = s.addJob(&jb)
+		if err != nil {
+			logger.Error(err)
+		}
+	} else {
+		logger.Error(err)
+	}
+	// notify other nodes.
+	err = s.notifyOtherNodes(fmt.Sprintf(fmt.Sprintf(jobAdd, key)))
+	if err != nil {
+		logger.Error(fmt.Sprintf("notify other nodes error: %s", err.Error()))
 	}
 }

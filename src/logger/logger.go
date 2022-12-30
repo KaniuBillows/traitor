@@ -2,19 +2,18 @@ package logger
 
 import (
 	"fmt"
+	"github.com/mitchellh/go-homedir"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
-	"time"
 )
 
-type logType int
-
 var (
-	mu     sync.Mutex
-	logger *log.Logger
+	mu      sync.Mutex
+	logger  *log.Logger
+	_logger *log.Logger
 )
 
 // prefix
@@ -26,22 +25,24 @@ const (
 	FATAL = "FATAL"
 )
 
-// todo:配置文件设置日志方式
-
 func init() {
-	var currPath, _ = os.Executable()
-	var path = filepath.Dir(currPath) + "/debug"
-	err := os.MkdirAll(path, os.ModePerm)
+	dir, err := homedir.Dir()
 	if err != nil {
 		panic(err)
 	}
-	var file = path + "/" + time.Now().Format("20060102") + ".txt"
+	var path = fmt.Sprintf("%s/.traitor/debug", dir)
+	err = os.MkdirAll(path, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	var file = path + "/traitorLog.txt"
 
 	logFile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0766)
 	if err != nil {
 		panic(err)
 	}
 	logger = log.New(logFile, "", log.LstdFlags|log.Lshortfile|log.LUTC)
+	_logger = log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile|log.LUTC)
 }
 func Debug(v ...any) {
 	_log(DEBUG, v)
@@ -63,6 +64,7 @@ func _log(prefix string, v any) {
 	defer mu.Unlock()
 	setPrefix(prefix)
 	logger.Println(v)
+	_logger.Println(v)
 }
 func setPrefix(logType string) {
 	_, file, line, ok := runtime.Caller(2)
@@ -73,4 +75,5 @@ func setPrefix(logType string) {
 		logPrefix = fmt.Sprintf("[%s]", logType)
 	}
 	logger.SetPrefix(logPrefix)
+	_logger.SetPrefix(logPrefix)
 }

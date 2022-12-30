@@ -31,8 +31,8 @@ func CreateClient(connection redis.Connection) *Client {
 		receiveBuf:  connection.GetClientReceiveBuff(),
 		sendBuf:     connection.GetClientSendBuff(),
 		writing:     &sync.WaitGroup{},
-		pendingReqs: make(chan *Request),
-		waitingReqs: make(chan *Request),
+		pendingReqs: make(chan *Request, chanSize),
+		waitingReqs: make(chan *Request, chanSize),
 	}
 	go c.handleWrite()
 	go c.handleRead()
@@ -41,12 +41,11 @@ func CreateClient(connection redis.Connection) *Client {
 }
 
 type Request struct {
-	id       uint64
-	args     [][]byte
-	reply    redis.Reply
-	waiting  *wait.Wait
-	err      error
-	callback func(reply redis.Reply)
+	id      uint64
+	args    [][]byte
+	reply   redis.Reply
+	waiting *wait.Wait
+	err     error
 }
 
 func (client *Client) Send(args [][]byte) redis.Reply {
@@ -66,17 +65,6 @@ func (client *Client) Send(args [][]byte) redis.Reply {
 		return protocol.MakeErrReply("Request failed")
 	}
 	return request.reply
-}
-func (client *Client) SendAsync(args [][]byte, cb func(reply redis.Reply)) {
-	request := &Request{
-		args:     args,
-		waiting:  &wait.Wait{},
-		callback: cb,
-	}
-	request.waiting.Add(1)
-	client.writing.Add(1)
-	defer client.writing.Done()
-	client.pendingReqs <- request
 }
 
 func (client *Client) handleWrite() {
@@ -122,9 +110,6 @@ func (client *Client) finishRequest(reply redis.Reply) {
 	if request.waiting != nil {
 		request.waiting.Done()
 	}
-	if request.callback != nil {
-		go request.callback(request.reply)
-	}
 }
 
 func (client *Client) Close() {
@@ -136,7 +121,7 @@ func (client *Client) Close() {
 	close(client.waitingReqs)
 }
 
-func (client *Client) handleRead() error {
+func (client *Client) handleRead() {
 	ch := parser.ParseStream(client.receiveBuf)
 	for payload := range ch {
 		if payload.Err != nil {
@@ -145,5 +130,4 @@ func (client *Client) handleRead() error {
 		}
 		client.finishRequest(payload.Data)
 	}
-	return nil
 }

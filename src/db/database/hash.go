@@ -232,7 +232,7 @@ func execHMSet(db *DB, args [][]byte) redis.Reply {
 		d.Put(field, value)
 	}
 	db.addAof(utils.ToCmdLine3("hmset", args...))
-	return &protocol.OkReply{}
+	return protocol.MakeOkReply()
 }
 func undoHMSet(db *DB, args [][]byte) []CmdLine {
 	key := string(args[0])

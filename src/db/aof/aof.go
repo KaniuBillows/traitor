@@ -102,6 +102,7 @@ func (handler *Handler) LoadAof(maxBytes int) {
 	}(aofChan)
 
 	file, err := os.Open(handler.aofFilename)
+
 	if err != nil {
 		if _, ok := err.(*os.PathError); ok {
 			return

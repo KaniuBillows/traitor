@@ -20,7 +20,8 @@ var defaultWriter io.Writer = os.Stdout
 
 func (c *Console) log(p func(string)) func(goja.FunctionCall) goja.Value {
 	return func(call goja.FunctionCall) goja.Value {
-		if format, ok := goja.AssertFunction(c.util.Get("format")); ok {
+		fmt := c.util.Get("format")
+		if format, ok := goja.AssertFunction(fmt); ok {
 			ret, err := format(c.util, call.Arguments...)
 			if err != nil {
 				panic(err)
@@ -58,7 +59,6 @@ func requireWithPrinter(writer io.Writer) require.ModuleLoader {
 		}
 
 		c.util = require.Require(runtime, util.ModuleName).(*goja.Object)
-
 		o := module.Get("exports").(*goja.Object)
 		o.Set("log", c.log(c.Log))
 		o.Set("error", c.log(c.Error))
@@ -74,6 +74,7 @@ func SetIoWriter(runtime *goja.Runtime, writer io.Writer) {
 		runtime: runtime,
 		writer:  writer,
 	}
+	c.util = require.Require(runtime, util.ModuleName).(*goja.Object)
 	s.Set("log", c.log(c.Log))
 	s.Set("error", c.log(c.Error))
 	s.Set("warn", c.log(c.Warn))

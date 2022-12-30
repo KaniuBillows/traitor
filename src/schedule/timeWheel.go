@@ -65,7 +65,7 @@ func (t *timeWheel) start() {
 func (t *timeWheel) stop() {
 	t.stopChannel <- false
 }
-func (t *timeWheel) removeTask(key string) {
+func (t *timeWheel) removeJob(key string) {
 	t.removeTaskChan <- key
 }
 
@@ -102,9 +102,8 @@ func (t *timeWheel) handleAddTask(task task) {
 		elem:      e,
 	}
 	if task.key != "" {
-		_, ok := t.locationMap[task.key] //if the same key has already exists.
-		if ok {
-			t.removeTask(task.key) // cover the same key.
+		if _, ok := t.locationMap[task.key]; ok { //if the same key has already exists.
+			t.handleRemove(task.key)
 		}
 	}
 	t.locationMap[task.key] = loc

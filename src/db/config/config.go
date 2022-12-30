@@ -2,6 +2,8 @@ package config
 
 import (
 	"bufio"
+	"fmt"
+	"github.com/mitchellh/go-homedir"
 	"io"
 	"os"
 	"reflect"
@@ -33,12 +35,18 @@ type ServerProperties struct {
 var Properties *ServerProperties
 
 func init() {
+	dir, err := homedir.Dir()
+	if err != nil {
+		panic("cannot load home dir")
+	}
+	path := fmt.Sprintf("%s/.traitor/db", dir)
+	_ = os.MkdirAll(path, os.ModePerm)
 	// default config
 	Properties = &ServerProperties{
 		//Bind:       "127.0.0.1",
 		//Port:       6379,
 		AppendOnly:     true, // aof
-		AppendFilename: "appendonly.aof",
+		AppendFilename: fmt.Sprintf("%s/appendonly.aof", path),
 	}
 }
 

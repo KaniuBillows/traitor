@@ -4,6 +4,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
+	"github.com/dop251/goja_nodejs/util"
 	"traitor/js_exec/debug_out"
 )
 
@@ -21,6 +22,7 @@ var debugRegistry = require.NewRegistry()
 func init() {
 	registry.RegisterNativeModule(console.ModuleName, console.Require)
 	debugRegistry.RegisterNativeModule(debug_out.ModuleName, debug_out.Require)
+	debugRegistry.RegisterNativeModule(util.ModuleName, util.Require)
 }
 func LoadModules(vm *goja.Runtime) {
 	registry.Enable(vm)

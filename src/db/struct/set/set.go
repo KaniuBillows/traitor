@@ -33,7 +33,7 @@ func (s *Set) ToSlice() []string {
 	return s.dict.Keys()
 }
 
-func (s *Set) FoEach(consumer func(member string) bool) {
+func (s *Set) ForEach(consumer func(member string) bool) {
 	s.dict.ForEach(func(key string, val any) bool {
 		return consumer(key)
 	})
@@ -51,7 +51,7 @@ func (s *Set) Intersect(s2 *Set) (set *Set) {
 		smSet = s2
 		bgrSet = s
 	}
-	smSet.FoEach(func(m string) bool {
+	smSet.ForEach(func(m string) bool {
 		if bgrSet.Has(m) {
 			set.Add(m)
 		}
@@ -62,11 +62,11 @@ func (s *Set) Intersect(s2 *Set) (set *Set) {
 
 func (s *Set) Union(s2 *Set) (set *Set) {
 	set = Make()
-	s.FoEach(func(member string) bool {
+	s.ForEach(func(member string) bool {
 		set.Add(member)
 		return true
 	})
-	s2.FoEach(func(member string) bool {
+	s2.ForEach(func(member string) bool {
 		set.Add(member)
 		return true
 	})
@@ -75,7 +75,7 @@ func (s *Set) Union(s2 *Set) (set *Set) {
 
 func (s *Set) Diff(s2 *Set) (set *Set) {
 	set = Make()
-	s.FoEach(func(member string) bool {
+	s.ForEach(func(member string) bool {
 		if s2.Has(member) == false {
 			set.Add(member)
 		}

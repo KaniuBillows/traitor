@@ -87,71 +87,42 @@ func rollbackZSetFields(db *DB, key string, fields ...string) []CmdLine {
 	return undoCmdLines
 }
 
-//func rollbackSetMembers(db *DB, key string, members ...string) []CmdLine {
-//	var undoCmdLines [][][]byte
-//	set, errReply := db.getAsSet(key)
-//	if errReply != nil {
-//		return nil
-//	}
-//	if set == nil {
-//		undoCmdLines = append(undoCmdLines,
-//			utils.ToCmdLine("DEL", key),
-//		)
-//		return undoCmdLines
-//	}
-//	for _, member := range members {
-//		ok := set.Has(member)
-//		if !ok {
-//			undoCmdLines = append(undoCmdLines,
-//				utils.ToCmdLine("SREM", key, member),
-//			)
-//		} else {
-//			undoCmdLines = append(undoCmdLines,
-//				utils.ToCmdLine("SADD", key, member),
-//			)
-//		}
-//	}
-//	return undoCmdLines
-//}
-
-//// undoSetChange rollbacks SADD and SREM command
-//func undoSetChange(db *DB, args [][]byte) []CmdLine {
-//	key := string(args[0])
-//	memberArgs := args[1:]
-//	members := make([]string, len(memberArgs))
-//	for i, mem := range memberArgs {
-//		members[i] = string(mem)
-//	}
-//	return rollbackSetMembers(db, key, members...)
-//}
-
-//	func rollbackZSetFields(db *DB, key string, fields ...string) []CmdLine {
-//		var undoCmdLines [][][]byte
-//		zset, errReply := db.getAsSortedSet(key)
-//		if errReply != nil {
-//			return nil
-//		}
-//		if zset == nil {
-//			undoCmdLines = append(undoCmdLines,
-//				utils.ToCmdLine("DEL", key),
-//			)
-//			return undoCmdLines
-//		}
-//		for _, field := range fields {
-//			elem, ok := zset.Get(field)
-//			if !ok {
-//				undoCmdLines = append(undoCmdLines,
-//					utils.ToCmdLine("ZREM", key, field),
-//				)
-//			} else {
-//				score := strconv.FormatFloat(elem.Score, 'f', -1, 64)
-//				undoCmdLines = append(undoCmdLines,
-//					utils.ToCmdLine("ZADD", key, score, field),
-//				)
-//			}
-//		}
-//		return undoCmdLines
-//	}
+// undoSetChange rollbacks SADD and SREM command
+func undoSetChange(db *DB, args [][]byte) []CmdLine {
+	key := string(args[0])
+	memberArgs := args[1:]
+	members := make([]string, len(memberArgs))
+	for i, mem := range memberArgs {
+		members[i] = string(mem)
+	}
+	return rollbackSetMembers(db, key, members...)
+}
+func rollbackSetMembers(db *DB, key string, members ...string) []CmdLine {
+	var undoCmdLines [][][]byte
+	set, errReply := db.getAsSet(key)
+	if errReply != nil {
+		return nil
+	}
+	if set == nil {
+		undoCmdLines = append(undoCmdLines,
+			utils.ToCmdLine("DEL", key),
+		)
+		return undoCmdLines
+	}
+	for _, member := range members {
+		ok := set.Has(member)
+		if !ok {
+			undoCmdLines = append(undoCmdLines,
+				utils.ToCmdLine("SREM", key, member),
+			)
+		} else {
+			undoCmdLines = append(undoCmdLines,
+				utils.ToCmdLine("SADD", key, member),
+			)
+		}
+	}
+	return undoCmdLines
+}
 func toTTLCmd(db *DB, key string) *protocol.MultiBulkReply {
 	raw, exists := db.ttlMap.Get(key)
 	if !exists {
