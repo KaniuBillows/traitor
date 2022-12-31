@@ -1,0 +1,11 @@
+version: '3'
+
+
+services:
+ traitor:
+      build: .
+      ports:
+        - "8080:8080"     
+      volumes:
+          - "~/.traitor:/root/.traitor"
+      container_name: "latest"    
