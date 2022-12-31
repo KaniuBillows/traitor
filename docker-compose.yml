@@ -8,4 +8,6 @@ services:
         - "8080:8080"     
       volumes:
           - "~/.traitor:/root/.traitor"
-      container_name: "latest"    
+      container_name: "latest"
+      environment:
+        -  GIN_MODE=release    
