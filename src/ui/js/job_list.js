@@ -3,6 +3,7 @@ initTable()
 
 function initTable() {
     const TimingExecute = 0
+    const Runnable = 1
     $('#table').bootstrapTable({
         url: '/api/jobList', method: 'get', classes: 'table table-bordered table-hover',  // bootstrap的表格样式
         cache: false, // 是否使用缓存，默认为true，一般来说需要设置一下这个属性
@@ -59,12 +60,15 @@ function initTable() {
                 }
             },
             {
-                field: '', title: 'operate', width: 200, formatter: (v, row, i) => {
+                field: '', title: 'operate', width: 200, formatter: (v, row, index) => {
+
                     let result = "<div style='display: flex;justify-content: space-evenly'>";
                     result += `<div class="form-check form-switch">
-                         <input class="form-check-input" type="checkbox" style="height: 2em;    width: 3.5em;" role="switch" id="flexSwitchCheckDefault" ${row.jobState === 0 ? '' : 'checked'}>
+                         <input class="form-check-input" type="checkbox" style="height: 2em;
+                          width: 3.5em;" role="switch" id="flexSwitchCheckDefault${index}" ${row.state === Runnable ? 'checked' : ''}
+                          onchange="enable('${row.jobId}',${index})"/>
                         </div>`
-                    result += `<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editModal" onclick="edit('${i}')">Setting</button>`
+                    result += `<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editModal" onclick="edit('${index}')">Setting</button>`
 
                     result += `<button type="button" class="btn btn-primary" onclick="window.open('/edit/${row.jobId}','_blank')" >Edit</button>`
 
@@ -81,10 +85,23 @@ function remove(id) {
     $.ajax({
         type: "DELETE", url: `/api/job?id=${id}`, success: (res) => {
             navClick('job_list')
+            reload()
         }
     })
 }
 
+function enable(id, index) {
+    let runnable = $(`#flexSwitchCheckDefault${index}`).is(':checked')
+
+    $.ajax({
+        type: "POST", url: `/api/enable?id=${id}&enable=${runnable}`,
+        success: (res) => {
+        },
+        error: (e) => {
+            console.error(e)
+        }
+    })
+}
 
 function edit(index) {
     let rows = $('#table').bootstrapTable('getData');
@@ -113,6 +130,8 @@ function save() {
         success: () => {
             $('#editModal').modal('hide');
             $('#cronInput').attr("class", "form-control")
+
+            reload()
         },
     })
 }
@@ -131,4 +150,9 @@ function cronCheck() {
     input.attr("class", "form-control is-valid")
     validCron.attr("hidden", "hidden")
 
+}
+
+function reload() {
+    $('#table').bootstrapTable('destroy');
+    initTable();
 }

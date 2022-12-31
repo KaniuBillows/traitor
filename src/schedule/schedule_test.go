@@ -31,11 +31,11 @@ func Test_resolveCron(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := resolveCron(tt.args.str)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("resolveCron() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ResolveCron() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got.Seconds() != tt.want.Seconds() {
-				t.Errorf("resolveCron() got = %v, want %v", got.Seconds(), tt.want.Seconds()) // only check second.
+				t.Errorf("ResolveCron() got = %v, want %v", got.Seconds(), tt.want.Seconds()) // only check second.
 			}
 		})
 	}
