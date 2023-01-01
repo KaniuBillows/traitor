@@ -1,13 +1,14 @@
 version: '3'
 
 
-services:
- traitor:
+services:      
+    app:     
       build: .
+      image: "traitor:latest"
       ports:
-        - "8080:8080"     
+          - "8080:8080"     
       volumes:
           - "~/.traitor:/root/.traitor"
       container_name: "latest"
       environment:
-        -  GIN_MODE=release    
+          -  GIN_MODE=release    
