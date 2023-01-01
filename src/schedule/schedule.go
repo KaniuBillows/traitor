@@ -28,6 +28,7 @@ type Schedule interface {
 	HandleJobTimeChange(key string)
 	CreateTask(key string, execType uint8) func()
 	CreateTaskForDebug(key string, writer io.Writer) (func(), *sync.WaitGroup)
+	ResolveCron(str string) (time.Duration, error)
 }
 type schedule struct {
 	dao       dao.Dao
@@ -45,6 +46,11 @@ func (s *schedule) CreateTask(key string, execType uint8) func() {
 			return
 		}
 		_, err = vm.RunString(sc.Script) // running logic.
+		if err != nil {
+			logger.Error(err)
+		}
+		// update last exec time
+		err = s.dao.UpdateJob(key, map[string]any{model.LastExecTime: time.Now()})
 		if err != nil {
 			logger.Error(err)
 		}
@@ -70,7 +76,7 @@ func (s *schedule) CreateTask(key string, execType uint8) func() {
 func (s *schedule) addJob(j *model.JobEntity) error {
 	fn := s.CreateTask(j.JobId, j.ExecType)
 	if j.ExecType == model.TimingExecute {
-		d, err := resolveCron(j.Cron)
+		d, err := s.ResolveCron(j.Cron)
 		if err != nil {
 			return err
 		}
@@ -112,15 +118,15 @@ func (s *schedule) CreateTaskForDebug(key string, writer io.Writer) (func(), *sy
 	}, &wt
 }
 
+// ResolveCron
 // return the delay time of the cron.
-func resolveCron(str string) (time.Duration, error) {
+func (s *schedule) ResolveCron(str string) (time.Duration, error) {
 	t := cronexpr.MustParse(str).Next(time.Now())
 	if t.IsZero() == true {
-		return time.Second * 0, errors.New("never get next time")
+		return time.Second * 0, errors.New("job would never get next exec time")
 	}
 	return t.Sub(time.Now()), nil
 }
-
 func StartMultiNode(redisStr string, mongoUri string, cluster string) (Schedule, dao.Dao) {
 	d := dao.CreateMongoDao(mongoUri)
 	schedule := makeMultiNode(redisStr, d, cluster)

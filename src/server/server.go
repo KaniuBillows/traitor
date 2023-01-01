@@ -96,7 +96,7 @@ func (s *server) Start(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	enableStr := c.Query("start")
+	enableStr := c.Query("enable")
 	enable, err := strconv.ParseBool(enableStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{})
@@ -253,6 +253,7 @@ func (s *server) RegistryRouting(engine *gin.Engine) {
 		api.POST("/job", s.Create)
 		api.POST("/script", s.UpdateScript)
 		api.GET("/debug", s.Debug)
+		api.POST("/enable", s.Start)
 	}
 	engine.GET("/edit/:id", s.EditPage)
 }

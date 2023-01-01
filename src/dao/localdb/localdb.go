@@ -130,11 +130,11 @@ func (l *LocalDb) GetJobInfo(jobId string) (model.JobEntity, error) {
 		}
 	}
 	state, err := strconv.ParseUint(mp[model.State], 10, 8)
-	if err != nil {
+	if err == nil {
 		entity.State = uint8(state)
 	}
 	exeType, err := strconv.ParseUint(mp[model.ExecType], 10, 8)
-	if err != nil {
+	if err == nil {
 		entity.ExecType = uint8(exeType)
 	}
 

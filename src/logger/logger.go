@@ -67,7 +67,7 @@ func _log(prefix string, v any) {
 	_logger.Println(v)
 }
 func setPrefix(logType string) {
-	_, file, line, ok := runtime.Caller(2)
+	_, file, line, ok := runtime.Caller(3)
 	var logPrefix string
 	if ok {
 		logPrefix = fmt.Sprintf("[%s][%s:%d]", logType, filepath.Base(file), line)
