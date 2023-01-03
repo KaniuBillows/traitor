@@ -82,7 +82,7 @@ func (s *schedule) addJob(j *model.JobEntity) error {
 		}
 		s.timeWheel.AddJob(d, j.JobId, fn)
 	} else {
-		delay := j.ExecAt.Sub(time.Now())
+		delay := j.ExecAt.ToTime().Sub(time.Now())
 		if delay <= 0 {
 			return errors.New("delay job has expired")
 		}

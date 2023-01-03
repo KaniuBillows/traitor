@@ -9,9 +9,8 @@ import (
 )
 
 func main() {
-
+	gin.SetMode("release")
 	r := gin.Default()
-
 	var mode string // running mode
 	var redisUri string
 	var mongoStr string

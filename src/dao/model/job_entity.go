@@ -19,9 +19,10 @@ type JobEntity struct {
 	Cron         string     `json:"cron,omitempty" bson:"cron,omitempty"  structs:"cron,omitempty"`
 	Description  string     `json:"description" bson:"description,omitempty" structs:"description,omitempty"`
 	LastExecTime *time.Time `json:"lastExecTime,omitempty" bson:"lastExecTime,omitempty" structs:"lastExecTime,omitempty"`
-	ExecAt       *time.Time `json:"execAt,omitempty" bson:"execAt,omitempty" structs:"execAt,omitempty"`
+	ExecAt       *TimeStamp `json:"execAt,omitempty" bson:"execAt,omitempty" structs:"execAt,omitempty"`
 	ExecType     uint8      `json:"execType" bson:"execType" structs:"execType"`
 	State        uint8      `json:"state" bson:"state" structs:"state"`
+	Script       string     `json:"script" bson:"script" structs:"script,omitempty"`
 }
 
 const (

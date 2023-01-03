@@ -11,7 +11,7 @@ type Dao interface {
 	GetRunnableJobs() ([]model.JobEntity, error)
 	GetJobInfo(jobId string) (model.JobEntity, error)
 	GetJobScript(jobId string) (model.ScriptEntity, error)
-	AddJob(job model.JobEntity) error
+	AddJob(job model.JobEntity) (string, error)
 	UpdateJob(jobId string, mp map[string]any) error
 	RemoveJob(jobId string) error
 }

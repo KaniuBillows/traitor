@@ -104,16 +104,16 @@ func (m *MongoDao) GetJobScript(jobId string) (model.ScriptEntity, error) {
 	return res, err
 }
 
-func (m *MongoDao) AddJob(job model.JobEntity) error {
+func (m *MongoDao) AddJob(job model.JobEntity) (string, error) {
 	if job.JobId == "" {
 		job.JobId = uuid.New().String()
 	}
 	coll := m.c.Database(databaseName).Collection(jobInfos)
 	_, err := coll.InsertOne(context.TODO(), job)
 	if err != nil {
-		return err
+		return job.JobId, err
 	}
-	return nil
+	return job.JobId, nil
 }
 
 func (m *MongoDao) UpdateJob(jobId string, mp map[string]any) error {
