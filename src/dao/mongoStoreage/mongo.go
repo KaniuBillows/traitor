@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"traitor/dao/model"
+	"traitor/logger"
 )
 
 const (
@@ -44,14 +45,17 @@ func (m *MongoDao) GetJobInfos() ([]model.JobEntity, error) {
 		"cron":    1,
 		"jobType": 1,
 	})
+	res := make([]model.JobEntity, 0)
+
 	cursor, err := coll.Find(context.TODO(), bson.M{}, opt)
 	if err != nil {
-		return nil, err
+		logger.Error(err.Error())
+		return res, err
 	}
-	var res []model.JobEntity
 	err = cursor.All(context.TODO(), &res)
 	if err != nil {
-		return nil, err
+		logger.Error(err.Error())
+		return res, err
 	}
 
 	return res, nil
@@ -64,14 +68,17 @@ func (m *MongoDao) GetRunnableJobs() ([]model.JobEntity, error) {
 		"cron":    1,
 		"jobType": 1,
 	})
+	res := make([]model.JobEntity, 0)
+
 	cursor, err := coll.Find(context.TODO(), filter, opt)
 	if err != nil {
-		return nil, err
+		logger.Error(err.Error())
+		return res, err
 	}
-	var res []model.JobEntity
 	err = cursor.All(context.TODO(), &res)
 	if err != nil {
-		return nil, err
+		logger.Error(err.Error())
+		return res, err
 	}
 
 	return res, nil

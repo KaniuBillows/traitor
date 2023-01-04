@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/gorhill/cronexpr"
@@ -44,7 +45,16 @@ func (s *server) Update(c *gin.Context) {
 	var mp map[string]any
 	var job model.JobEntity
 	err := c.BindJSON(&mp)
-	err = c.BindJSON(&job)
+	buffer, err := json.Marshal(mp)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
+	err = json.Unmarshal(buffer, &job)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
 
 	delete(mp, model.State)
 	delete(mp, model.LastExecTime)

@@ -118,7 +118,7 @@ function save() {
     let job = {
         name: $('#jobNameInput').val(), description: $('#descriptionInput').val(), cron: $('#cronInput').val()
     }
-    let url = createFlag ? '/api/job' : `/api/job?id=${id}`
+    let url = createFlag ? '/api/job?type=timing' : `/api/job?id=${id}`
     let method = createFlag ? 'POST' : 'PUT'
 
     $.ajax({
