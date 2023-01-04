@@ -89,7 +89,7 @@ must be **timeStamp** and the minim delay is 5 seconds.
     "name":"say happy new year",
     "description":"say happy new year to my friends at 2023 1.1 0:00 am",
     "execAt":"1672502400", //use time Stamp.
-     "script":"//....."
+    "script":"//....."
 }
 ```
 
@@ -103,11 +103,21 @@ success return :
 
 ### Start/Stop a job
 
-`POST: /api/enable?id={id}&enable={enable}`
+```
+POST: /api/enable?id={id}&enable={enable}
+```
 
 required **query** param:
 `id:`  
 just put the value that [Create](#Create-a-Job) returned.
+
+the body allows these fields as follows:
+
+- `name`
+- `cron` set the cron expression.Effective for timing job
+- `description`
+- `execAt` effective for delay job,it's timeStamp
+- `script`
 
 **enable is true**:   
 server would judge whether the operating conditions are met.
@@ -121,7 +131,9 @@ just remove this job from schedule if it exists.
 Sometimes we need change the task's execution strategy or basic information.
 We can use this api.
 
-`PUT : /api/job?id={id}`
+```
+PUT : /api/job?id={id}
+```
 
 Body:
 
@@ -136,7 +148,7 @@ Body:
 the body is just a dictionary that
 all fields you want to update should be contained.
 
-the body allows follow fields:
+the body allows these fields as follows:
 
 - `name`
 - `execType` set execType: timing job for `0`  delay job for `1`
@@ -147,6 +159,241 @@ the body allows follow fields:
 
 ### Delete a job
 
-### Run job directly
+```
+DELTE /api/job?id={id}
+```
 
 ### Get job info
+
+```
+GET /api/job?id={id}
+```
+
+this would **not** return the **script**.
+
+return:
+
+```
+{
+    "data":
+    {
+        "name":"Every Monday 8:00am" ,
+        "description":"say good morning to your friends",
+        "lastExecTime":"2022-12-04T07:17:58.782261202Z",
+        "cron":"0 0 8 ? * MON"        
+    }
+}
+```
+
+### Get Script
+
+```
+GET /api/script?id={id}
+```
+
+return:
+
+```
+{
+    "data":
+    {
+        "jobId":"xxx",
+        "script":"xxx..."
+    }
+}
+```
+
+### Run job directly
+
+add a job and make it runnable.
+
+this API will check all required param,
+include `execType`and `execAt` or `cron`
+
+``` 
+POST /api/run
+```
+
+body:  
+delay example:
+
+```
+{
+    "name":"say happy new year",
+    "description":"say happy new year to my friends at 2023 1.1 0:00 am",
+    "execType":"1"
+    "execAt":"1672502400", //use time Stamp.
+    "script":"//....."
+}
+```
+
+timing example:
+
+```
+{
+    "name":"Every Monday 8:00am" ,
+    "description":"say good morning to your friends",
+    "cron":"0 0 8 ? * MON",
+    "script":"//....."
+ }
+```
+
+return
+
+```
+{
+    "data":"jobid"
+}
+```
+
+### Debug a job
+
+**Notice:** this is a websocket API
+
+if a job is lunched by this api,the `console.log()` would print all result into
+the **webSocket** client.
+
+url:
+
+```
+ws://{host}/api/debug
+```
+
+usage example:
+
+script content:
+
+```
+console.log("hello world")
+```
+
+Client:
+
+```
+ let id = getId() // jobId  
+ let host = window.location.host
+ 
+ const ws = new WebSocket(`ws://${host}/api/debug?id=${id}`) // create a webSocket
+ 
+ ws.addEventListener('message', e => {
+        console.log(e.data) //the debug out result.
+ })
+    
+```
+
+result:
+
+```
+hello world
+```
+
+###
+
+# JavaScript
+
+traitor is written by Golang but the tasks are javaScripts.The reason we do this is we want to keep the dynamic,
+the business logic is rapid changing.
+
+For running the js job,we choose the [Goja](https://github.com/dop251/goja) as the js runtime.
+Goja contains full ECMAScript 5.1 support.But it's just a runtime
+almost no standard library.Here's a [way](#plugin-development) that you can build
+your **js library** with Golang.
+
+So far we only support the JS **string**. Multi-file js program needs file system support,this will be supported in
+the **future**
+We plan to do it through mongoDB.
+
+This script will be executed sequentially from top to bottom. Of course,
+you can also define functions freely, as long
+as your code conforms to the ES5 specification.
+
+```
+console.log("hello world") 
+
+SayHello()
+
+function SayHello(){
+    console.log("hello")
+}
+```
+
+# Cluster
+
+The carrying capacity and throughput of a single node are limited,
+and it cannot handle large-scale task scheduling.
+You can deploy multi nodes with a simple way.
+
+Still remember the [startup parameters](#startup-parameters)?
+
+we can set the running mode with `-m`.just set `-m multi`.
+And we need a redis server with `-r 127.0.0.1:6379`and a mongoDB with `mongodb://example.com:27017`.They are
+indispensable under the distributed deployment
+of traitor.
+
+Then you can start traitor it or add more nodes.
+
+There is an example that deploy two nodes with docker-compose:
+
+```
+version: '3'
+
+services:
+    redis:
+      image: "redis:7.0.7"  
+      container_name: "redis"
+      ports:
+          - "6379:6379"
+          
+    mongo:
+      image: "mongo:4.2.23"
+      container_name: "mongo"
+      ports:
+          - "27017:27017"
+                          
+    node0:           
+      image: "kaniu141/traitor:latest"
+      ports:
+          - "8080:8080"     
+      volumes:
+          - "~/node0/.traitor:/root/.traitor"
+      container_name: "node0"
+      depends_on:
+          - redis
+          - mongo
+      command: -m multi -r 127.0.0.1:6379 -mg mongodb://127.0.0.1:27017
+      links:
+          - redis
+          - mongo
+              
+    node1:
+      image: "kaniu141/traitor:latest"
+      ports:
+          - "8081:8080"     
+      volumes:
+          - "~/node1/.traitor:/root/.traitor"
+      container_name: "node1" 
+      depends_on:
+          - redis
+          - mongo
+      command: -m multi -r 127.0.0.1:6379 -mg mongodb://127.0.0.1:27017
+      links:
+          - redis
+          - mongo 
+```
+
+**This is just an example,In a real distributed deployment, this method will not be used, but this example is to let
+you know the dependencies between traitor and other services.**
+
+You should decide how to deploy according to your own situation.
+
+Just wait a moment, we forget a param `-c`,this will specify a **cluster name**.
+all the nodes with the same cluster name will share the task load.
+
+If you have multiple clusters,you don't need to prepare a redis and mongoDB for each cluster,
+you can just set different cluster name.
+
+# Working principle
+
+# Plugin Development
+
+todo...

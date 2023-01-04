@@ -12,11 +12,11 @@ import (
 	"time"
 	"traitor/dao"
 	"traitor/dao/model"
-	"traitor/logger"
 	"traitor/schedule"
 )
 
 func (s *server) JobList(c *gin.Context) {
+
 	jobs, err := s.dao.GetJobInfos()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
@@ -26,6 +26,7 @@ func (s *server) JobList(c *gin.Context) {
 }
 func (s *server) Remove(c *gin.Context) {
 	id := c.Query("id")
+	s.schedule.Remove(id)
 	err := s.dao.RemoveJob(id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
@@ -176,12 +177,32 @@ func (s *server) EditPage(c *gin.Context) {
 	}
 	sc, err := s.dao.GetJobScript(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"err": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"err": err.Error()})
 		return
 	}
 	c.HTML(http.StatusOK, "edit_script.html", gin.H{
 		"script": sc.Script,
 	})
+}
+
+func (s *server) GetScript(c *gin.Context) {
+	id := c.Param("id")
+	sc, err := s.dao.GetJobScript(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"err": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": sc})
+}
+
+func (s *server) GetJobInfo(c *gin.Context) {
+	id := c.Query("id")
+	j, err := s.dao.GetJobInfo(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": j})
 }
 
 func (s *server) Run(c *gin.Context) {
@@ -201,6 +222,7 @@ func (s *server) Run(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
 	entity.LastExecTime = nil
 	entity.State = model.Runnable
 	entity.ExecType = execType
@@ -255,7 +277,6 @@ type wsWriter struct {
 }
 
 func (w *wsWriter) Write(p []byte) (n int, err error) {
-	logger.Debug(p)
 	err = w.ws.WriteMessage(websocket.TextMessage, p)
 	if err != nil {
 		return 0, err
@@ -266,6 +287,7 @@ func (w *wsWriter) Write(p []byte) (n int, err error) {
 /**********WS***********/
 
 func (s *server) Debug(c *gin.Context) {
+	id := c.Query("id")
 	ws, err := s.upgrade.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{})
@@ -275,16 +297,12 @@ func (s *server) Debug(c *gin.Context) {
 		_ = ws.Close()
 	}(ws)
 
-	_, message, err := ws.ReadMessage()
-	if err != nil {
-	}
-	id := string(message)
 	write := wsWriter{
 		ws: ws,
 	}
 
 	fn, wt := s.schedule.CreateTaskForDebug(id, &write)
-	fn()
+	go fn()
 	wt.Wait()
 }
 
@@ -360,6 +378,7 @@ func (s *server) RegistryRouting(engine *gin.Engine) {
 		api.PUT("/job", s.Update)
 		api.POST("/job", s.Create)
 		api.POST("/script", s.UpdateScript)
+		api.GET("/script", s.GetScript)
 		api.GET("/debug", s.Debug)
 		api.POST("/enable", s.Start)
 		api.POST("/run", s.Run)

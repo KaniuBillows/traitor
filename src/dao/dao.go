@@ -16,7 +16,7 @@ type Dao interface {
 	RemoveJob(jobId string) error
 }
 
-func CreateMongoDao(uri string) Dao {
+func CreateMongoDao(uri string, cluster string) Dao {
 	return mongoStoreage.CreateMongoDao(uri)
 }
 func CreateLocalDao() Dao {

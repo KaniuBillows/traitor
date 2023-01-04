@@ -31,16 +31,14 @@ function response() {
 }
 
 function debugScript() {
+    debug_out.length = 0
     let host = window.location.host
-    const ws = new WebSocket(`ws://${host}/api/debug`)
+    let id = getId()
+
+    const ws = new WebSocket(`ws://${host}/api/debug?id=${id}`)
     ws.addEventListener('message', e => {
         debug_out.push(e.data)
         response()
-    })
-    debug_out.length = 0
-    let id = getId()
-    ws.addEventListener('open', e => {
-        ws.send(id)
     })
 }
 

@@ -197,15 +197,19 @@ func (s *MultiNodeSchedule) CreateTask(key string, execType uint8) func() {
 func (s *MultiNodeSchedule) executable(key string) bool {
 	return s.consistentMap.Get(key) == s.NodeId
 }
+func (s *MultiNodeSchedule) Remove(key string) {
+	_ = s.cancelJob(key)
+}
 
 // cancelJob remove the job from the time wheel.
 func (s *MultiNodeSchedule) cancelJob(key string) error {
+	s.timeWheel.removeJob(key) // remove local job.
 	// notify other nodes.
 	err := s.notifyOtherNodes(fmt.Sprintf(jobCancel, key))
 	if err != nil {
 		return err
 	}
-	s.timeWheel.removeJob(key) // remove local job.
+
 	return nil
 }
 
