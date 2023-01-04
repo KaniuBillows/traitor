@@ -18,15 +18,15 @@ func TestGet(t *testing.T) {
 	//req := registry.Enable(vm)
 	//v, _ := req.Require("node:console")
 	const script = `
-	//const http = require("node")
-	//var result
-	//http.get('https://api.kaniu.pro/ne/search?keyword=%E9%98%BF%E7%89%9B',(e)=>{
-	//	var obj = JSON.parse(e.ResponseText)
-	//	console.logger(JSON.stringify(obj[0]))
-	//	result = obj
-	//},(err)=>{})
-	//var console = require("node:console")
-	console.log("hello world")
+	const http = require("http")
+	var result
+	http.get('https://api.kaniu.pro/ne/search?keyword=%E9%98%BF%E7%89%9B',(e)=>{
+		var obj = JSON.parse(e.ResponseText)
+		console.logger(JSON.stringify(obj[0]))
+		result = obj
+	},(err)=>{})
+	console.log()
+
 `
 	_, err := vm.RunString(script)
 	//var l = v.(*goja.Object).Get("log")

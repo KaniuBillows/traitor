@@ -56,6 +56,9 @@ func (s *StandaloneSchedule) HandleJobStateChange(key string, state uint8) {
 		}
 	}
 }
+func (s *StandaloneSchedule) Remove(key string) {
+	_ = s.cancelJob(key)
+}
 
 func (s *StandaloneSchedule) cancelJob(key string) error {
 	s.timeWheel.removeJob(key)

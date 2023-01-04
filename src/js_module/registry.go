@@ -1,11 +1,11 @@
-package js_exec
+package js_module
 
 import (
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
 	"github.com/dop251/goja_nodejs/util"
-	"traitor/js_exec/debug_out"
+	"traitor/js_module/debug_out"
 )
 
 func RegistryModule(moduleName string, loader require.ModuleLoader) {

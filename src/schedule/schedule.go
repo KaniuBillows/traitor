@@ -11,8 +11,8 @@ import (
 	"time"
 	"traitor/dao"
 	"traitor/dao/model"
-	"traitor/js_exec"
-	"traitor/js_exec/debug_out"
+	"traitor/js_module"
+	"traitor/js_module/debug_out"
 	"traitor/logger"
 )
 
@@ -29,6 +29,7 @@ type Schedule interface {
 	CreateTask(key string, execType uint8) func()
 	CreateTaskForDebug(key string, writer io.Writer) (func(), *sync.WaitGroup)
 	ResolveCron(str string) (time.Duration, error)
+	Remove(key string)
 }
 type schedule struct {
 	dao       dao.Dao
@@ -38,8 +39,8 @@ type schedule struct {
 func (s *schedule) CreateTask(key string, execType uint8) func() {
 
 	execFunc := func() {
-		vm := goja.New()        // the vm is not concurrent safe.
-		js_exec.LoadModules(vm) // native modules support.
+		vm := goja.New()          // the vm is not concurrent safe.
+		js_module.LoadModules(vm) // native modules support.
 		var sc, err = s.dao.GetJobScript(key)
 		if err != nil {
 			logger.Error(fmt.Sprintf("running Task failed:%s download script error.", key))
@@ -82,7 +83,7 @@ func (s *schedule) addJob(j *model.JobEntity) error {
 		}
 		s.timeWheel.AddJob(d, j.JobId, fn)
 	} else {
-		delay := j.ExecAt.Sub(time.Now())
+		delay := j.ExecAt.ToTime().Sub(time.Now())
 		if delay <= 0 {
 			return errors.New("delay job has expired")
 		}
@@ -99,7 +100,7 @@ func (s *schedule) CreateTaskForDebug(key string, writer io.Writer) (func(), *sy
 			wt.Done()
 		}()
 		vm := goja.New()
-		js_exec.LoadModulesForDebugMode(vm)
+		js_module.LoadModulesForDebugMode(vm)
 		debug_out.SetIoWriter(vm, writer) // this vm would use this writer.
 		var sc, err = s.dao.GetJobScript(key)
 		if err != nil {

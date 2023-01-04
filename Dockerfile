@@ -11,8 +11,8 @@ RUN go env -w  GOPROXY=https://goproxy.io,direct
 RUN go mod download
 
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /docker-traitor
-COPY src/ui /ui
+RUN CGO_ENABLED=0 GOOS=linux go build -o /traitor/docker-traitor
+COPY src/ui /traitor/ui
 
 ##
 ## Deploy
@@ -23,7 +23,7 @@ FROM scratch
 WORKDIR /
 
 # copy exe
-COPY --from=build /docker-traitor /docker-traitor
-COPY --from=build /ui /ui
+COPY --from=build /traitor/docker-traitor /traitor/docker-traitor
+COPY --from=build /traitor/ui /traitor/ui
 
-ENTRYPOINT ["/docker-traitor"]
+ENTRYPOINT ["/traitor/docker-traitor"]

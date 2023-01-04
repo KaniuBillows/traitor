@@ -5,6 +5,7 @@ const editor = CodeMirror.fromTextArea(ele, {
 
 editor.setSize('100%', '100%')
 
+
 function getId() {
     let p = window.location.pathname
     return p.substring(6, p.length)
@@ -16,7 +17,7 @@ function saveScript() {
     console.log(id)
     $.post(`/api/script?id=${id}`, JSON.stringify({
         "script": sc
-    }),()=>{
+    }), () => {
 
     })
 }
@@ -30,15 +31,14 @@ function response() {
 }
 
 function debugScript() {
-    const ws = new WebSocket('ws://localhost:8080/api/debug')
+    debug_out.length = 0
+    let host = window.location.host
+    let id = getId()
+
+    const ws = new WebSocket(`ws://${host}/api/debug?id=${id}`)
     ws.addEventListener('message', e => {
         debug_out.push(e.data)
         response()
-    })
-    debug_out.length = 0
-    let id = getId()
-    ws.addEventListener('open', e => {
-        ws.send(id)
     })
 }
 

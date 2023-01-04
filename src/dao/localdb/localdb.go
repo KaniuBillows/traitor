@@ -125,8 +125,9 @@ func (l *LocalDb) GetJobInfo(jobId string) (model.JobEntity, error) {
 	}
 	if mp[model.ExecAt] != "" {
 		t, err := time.Parse("2017-08-30 16:40:41", mp[model.ExecAt])
+		var ts = model.TimeStamp(t)
 		if err != nil {
-			entity.ExecAt = &t
+			entity.ExecAt = &ts
 		}
 	}
 	state, err := strconv.ParseUint(mp[model.State], 10, 8)
@@ -153,7 +154,7 @@ func (l *LocalDb) GetJobScript(jobId string) (model.ScriptEntity, error) {
 	}
 	return result, nil
 }
-func (l *LocalDb) AddJob(job model.JobEntity) error {
+func (l *LocalDb) AddJob(job model.JobEntity) (string, error) {
 	if job.JobId == "" {
 		job.JobId = uuid.NewString()
 	}
@@ -171,8 +172,18 @@ func (l *LocalDb) AddJob(job model.JobEntity) error {
 			value = strconv.FormatUint(uint64(v.(uint8)), 10)
 		case uint64:
 			value = strconv.FormatUint(v.(uint64), 10)
-		case time.Time:
-			value = v.(time.Time).String()
+		case *time.Time:
+			t := v.(*time.Time)
+			if t == nil {
+				continue
+			}
+			value = t.String()
+		case *model.TimeStamp:
+			t := v.(*model.TimeStamp)
+			if t == nil {
+				continue
+			}
+			value = t.ToString()
 		default:
 			continue // ignore
 		}
@@ -183,7 +194,7 @@ func (l *LocalDb) AddJob(job model.JobEntity) error {
 	cmd := utils.ToCmdLine(args...)
 	reply := l.client.Send(cmd)
 	if status, ok := reply.(*protocol.StatusReply); ok == false || status.IsOKReply() == false {
-		return errors.New("add failed")
+		return job.JobId, errors.New("add failed")
 	}
 	setArg := make([]string, 3)
 	setArg[0] = "SADD"
@@ -192,9 +203,9 @@ func (l *LocalDb) AddJob(job model.JobEntity) error {
 	setCmd := utils.ToCmdLine(setArg...)
 	setReply := l.client.Send(setCmd)
 	if intReply, ok := setReply.(*protocol.IntReply); ok == false || intReply.Code != 1 {
-		return errors.New("add failed")
+		return job.JobId, errors.New("add failed")
 	}
-	return nil
+	return job.JobId, nil
 }
 func (l *LocalDb) UpdateJob(jobId string, mp map[string]any) error {
 	if jobId == "" {

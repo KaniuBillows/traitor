@@ -7,5 +7,5 @@
 - Seamless and automatic failover
 
 [GitHub](https://github.com/KaniuBillows/traitor/)
-[Get Started](#neteasecloudmusicapi)
+[Get Started](#getting-started)
 
