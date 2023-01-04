@@ -129,7 +129,7 @@ func (s *schedule) ResolveCron(str string) (time.Duration, error) {
 	return t.Sub(time.Now()), nil
 }
 func StartMultiNode(redisStr string, mongoUri string, cluster string) (Schedule, dao.Dao) {
-	d := dao.CreateMongoDao(mongoUri)
+	d := dao.CreateMongoDao(mongoUri, cluster)
 	schedule := makeMultiNode(redisStr, d, cluster)
 	ctx := context.Background()
 	schedule.Start(ctx)

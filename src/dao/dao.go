@@ -17,7 +17,7 @@ type Dao interface {
 }
 
 func CreateMongoDao(uri string, cluster string) Dao {
-	return mongoStoreage.CreateMongoDao(uri)
+	return mongoStoreage.CreateMongoDao(uri, cluster)
 }
 func CreateLocalDao() Dao {
 	return localdb.CreateLocalDao()
