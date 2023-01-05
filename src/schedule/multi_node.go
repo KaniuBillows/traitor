@@ -97,8 +97,10 @@ func (s *MultiNodeSchedule) syncNodeList(ctx context.Context) {
 			break
 		}
 	}
+	consistenthash.RwLock.RLock()
 	s.consistentMap = consistenthash.New(replicaCount, nil)
 	s.consistentMap.Add(list...)
+	consistenthash.RwLock.Unlock()
 }
 func (s *MultiNodeSchedule) startSyncNodeList(ctx context.Context) {
 	go func() {
@@ -195,6 +197,10 @@ func (s *MultiNodeSchedule) CreateTask(key string, execType uint8) func() {
 }
 
 func (s *MultiNodeSchedule) executable(key string) bool {
+	consistenthash.RwLock.RLock()
+	defer func() {
+		consistenthash.RwLock.RUnlock()
+	}()
 	return s.consistentMap.Get(key) == s.NodeId
 }
 func (s *MultiNodeSchedule) Remove(key string) {

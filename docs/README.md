@@ -326,7 +326,7 @@ You can deploy multi nodes with a simple way.
 Still remember the [startup parameters](#startup-parameters)?
 
 we can set the running mode with `-m`.just set `-m multi`.
-And we need a redis server with `-r 127.0.0.1:6379`and a mongoDB with `mongodb://example.com:27017`.They are
+And we need a redis server with `-r redis://localhost:6379`and a mongoDB with `mongodb://example.com:27017`.They are
 indispensable under the distributed deployment
 of traitor.
 
@@ -360,10 +360,8 @@ services:
       depends_on:
           - redis
           - mongo
-      command: -m multi -r 127.0.0.1:6379 -mg mongodb://127.0.0.1:27017
-      links:
-          - redis
-          - mongo
+      command: -m multi -r redis://redis:6379 -mg mongodb://mongo:27017
+
               
     node1:
       image: "kaniu141/traitor:latest"
@@ -375,10 +373,7 @@ services:
       depends_on:
           - redis
           - mongo
-      command: -m multi -r 127.0.0.1:6379 -mg mongodb://127.0.0.1:27017
-      links:
-          - redis
-          - mongo 
+      command: -m multi -r redis://redis:6379 -mg mongodb://mongo:27017     
 ```
 
 **This is just an example,In a real distributed deployment, this method will not be used, but this example is to let
@@ -387,12 +382,44 @@ you know the dependencies between traitor and other services.**
 You should decide how to deploy according to your own situation.
 
 Just wait a moment, we forget a param `-c`,this will specify a **cluster name**.
-all the nodes with the same cluster name will share the task load.
+all the nodes with the same cluster name will **share the task load**.
 
 If you have multiple clusters,you don't need to prepare a redis and mongoDB for each cluster,
 you can just set different cluster name.
 
 # Working principle
+
+For standalone mode,we implement a built-in K-V memory database and use
+AOF persistence scheme just like Redis.
+
+But for cluster,the local storage obviously can't meet the needs.So We choose
+mongoDB as the storage.You should be flexible to choose mongoDB
+configuration to suit your scenario.
+
+Traitor uses **time-wheel algorithm** for task scheduling.
+In cluster, each node holds all tasks that could be running.When tick triggers,
+all subsequent tasks will be executed.So how to balance the execution load of the nodes?
+
+**Distributed locks** are a viable solution,
+but it also brings problem:the **time** of each node must be the same,
+otherwise the task will not be executed evenly among the nodes.
+
+In the end, we decided to determine which node should execute the task by
+hashing the task id .When a node start, it will connect to the redis and
+submit the node id with an expiration time of 1s as **heartbeat** cyclically.
+Active nodes' heartbeats will form a set of nodes.Each node will
+request the node set and hashing the task id,if the hashing result equals current node,
+the job will be executed by current node.
+
+And you might notice that traitor cluster doesn't contain a master node.It means
+every node could receive the [Web Request](#web-api) or [debug](#debug-a-job) a job.
+
+When a node receive a request, for example the `Run` request.It stores it in the database first,
+then adds it to its own schedule.
+After that, other nodes in the cluster will be notified through the **Pub-Sub mode** of redis
+
+So you can set up a load balancer,
+such as `nginx`, to provide a unified API entry for the traitor cluster.
 
 # Plugin Development
 

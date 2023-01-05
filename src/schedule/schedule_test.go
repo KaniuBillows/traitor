@@ -27,9 +27,10 @@ func Test_resolveCron(t *testing.T) {
 			wantErr: true,
 		},
 	}
+	var s = makeStandalone(nil)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveCron(tt.args.str)
+			got, err := s.ResolveCron(tt.args.str)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ResolveCron() error = %v, wantErr %v", err, tt.wantErr)
 				return
