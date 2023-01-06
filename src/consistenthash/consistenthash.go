@@ -4,12 +4,9 @@ import (
 	"hash/crc32"
 	"sort"
 	"strconv"
-	"sync"
 )
 
 type hash func(data []byte) uint32
-
-var RwLock = sync.RWMutex{}
 
 type Map struct {
 	hash     hash

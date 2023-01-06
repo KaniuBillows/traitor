@@ -6,6 +6,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"strings"
+	"sync/atomic"
 	"time"
 	"traitor/consistenthash"
 	"traitor/dao"
@@ -19,14 +20,19 @@ const (
 	replicaCount     = 50
 	redisChannel     = "traitor_pub_sub"
 )
+const (
+	lostSync  = 0
+	keepAlive = 1
+)
 
 type MultiNodeSchedule struct {
 	schedule
 	client        *redis.Client
 	NodeId        string
 	cancel        context.CancelFunc
-	consistentMap *consistenthash.Map
+	consistentMap atomic.Value
 	cluster       string
+	state         uint8
 }
 
 func makeMultiNode(redisStr string, d dao.Dao, cluster string) *MultiNodeSchedule {
@@ -44,6 +50,7 @@ func makeMultiNode(redisStr string, d dao.Dao, cluster string) *MultiNodeSchedul
 		client:   client,
 		NodeId:   nodeId + cluster + uid.String(),
 		cluster:  cluster,
+		state:    lostSync,
 	}
 	return s
 }
@@ -59,12 +66,9 @@ func (s *MultiNodeSchedule) Close() {
 
 func (s *MultiNodeSchedule) Start(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
-
 	s.cancel = cancel
-
 	s.startHeartBeat(ctx)
 	s.startSyncNodeList(ctx)
-	s.initJobs()
 	s.startSub(ctx)
 	s.timeWheel.start()
 }
@@ -84,23 +88,31 @@ func (s *MultiNodeSchedule) syncNodeList(ctx context.Context) {
 	var cursor uint64 = 0
 	list := make([]string, 0)
 	matchStr := fmt.Sprintf("%s*", nodeId+s.cluster)
+	errorFlag := false
 	for {
 		scan := s.client.Scan(ctx, cursor, matchStr, 1000)
 		keys, cursor, err := scan.Result()
 		if err != nil {
 			logger.Error("cannot sync node list from redis")
-			s.Close()
-			return
+			list = nil // clear slice.
+			errorFlag = true
+			s.state = lostSync
+			break
 		}
 		list = append(list, keys...)
 		if cursor == 0 {
 			break
 		}
 	}
-	consistenthash.RwLock.RLock()
-	s.consistentMap = consistenthash.New(replicaCount, nil)
-	s.consistentMap.Add(list...)
-	consistenthash.RwLock.Unlock()
+	// recover from the network connection error.
+	if errorFlag == false && s.state == lostSync {
+		s.state = keepAlive
+		s.initJobs() // re-sync all job state from DB.
+	}
+
+	mp := consistenthash.New(replicaCount, nil)
+	mp.Add(list...)
+	s.consistentMap.Swap(mp)
 }
 func (s *MultiNodeSchedule) startSyncNodeList(ctx context.Context) {
 	go func() {
@@ -132,7 +144,6 @@ func (s *MultiNodeSchedule) startHeartBeat(ctx context.Context) {
 					if res.Err() != nil {
 						// sth wrong with the redis connection.
 						logger.Error(res.Err())
-						s.Close()
 					}
 				}
 			case <-ctx.Done():
@@ -192,16 +203,13 @@ func (s *MultiNodeSchedule) CreateTask(key string, execType uint8) func() {
 		if s.executable(key) {
 			fn()
 		}
-		return
 	}
 }
 
 func (s *MultiNodeSchedule) executable(key string) bool {
-	consistenthash.RwLock.RLock()
-	defer func() {
-		consistenthash.RwLock.RUnlock()
-	}()
-	return s.consistentMap.Get(key) == s.NodeId
+	mp := s.consistentMap.Load()
+	m := mp.(*consistenthash.Map)
+	return m.Get(key) == s.NodeId
 }
 func (s *MultiNodeSchedule) Remove(key string) {
 	_ = s.cancelJob(key)

@@ -404,11 +404,11 @@ all subsequent tasks will be executed.So how to balance the execution load of th
 but it also brings problem:the **time** of each node must be the same,
 otherwise the task will not be executed evenly among the nodes.
 
-In the end, we decided to determine which node should execute the task by
-hashing the task id .When a node start, it will connect to the redis and
+In the end, we decided to determine which node should execute the task by consistent hash.
+When a node start, it will connect to the redis and
 submit the node id with an expiration time of 1s as **heartbeat** cyclically.
-Active nodes' heartbeats will form a set of nodes.Each node will
-request the node set and hashing the task id,if the hashing result equals current node,
+**Active nodes**' heartbeats will form a set as the **consistent hash ring**.Each node will
+request the hash ring and hashing the task id,if the result equals current node,
 the job will be executed by current node.
 
 And you might notice that traitor cluster doesn't contain a master node.It means
@@ -416,10 +416,26 @@ every node could receive the [Web Request](#web-api) or [debug](#debug-a-job) a 
 
 When a node receive a request, for example the `Run` request.It stores it in the database first,
 then adds it to its own schedule.
-After that, other nodes in the cluster will be notified through the **Pub-Sub mode** of redis
+After that, other nodes in the cluster will be notified
+through the **Pub-Sub mode** of redis.Then the task state will sync to other nodes.
 
-So you can set up a load balancer,
-such as `nginx`, to provide a unified API entry for the traitor cluster.
+If there is a node offline, or there is a problem with connection to redis,
+the **active nodes set** will not contain that problem node.So there will not be any task
+load distribution to the problematic nodes.
+
+From the point of view of the problematic node,node request hash ring ,but get an error,
+so the hash ring is just empty.The time-wheel is still ticking,but when the node try to execute
+the task,the consistent hashing result is never allowed that because it's empty.
+
+If the node could back online,the heartbeat will recover too,other nodes in the cluster
+can also perceive it.The task load distribution return to work,each node will figure out
+whether the task should be executed by itself.
+
+If a new node add into the cluster the process is also similar.
+
+So you don't need to worry about witch node is the request you should send to.
+You can set up a load balancer, such as `nginx` to provide a unified API entry for the traitor cluster,
+because the nodes in the cluster do not distinguish between master and slave.
 
 # Plugin Development
 
