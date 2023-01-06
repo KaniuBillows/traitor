@@ -1,5 +1,6 @@
 # Traitor
 
+
 [Document](https://kaniubillows.github.io/traitor/#/)  
 [中文文档](https://kaniubillows.github.io/traitor/#/zh-cn/)
 
@@ -7,15 +8,19 @@
 
 ## docker
 
-`docker pull kaniu141/traitor`  
-`docker run -p 8080:8080 -d traitor:latest`
+```
+docker pull kaniu141/traitor
+docker run -p 8080:8080 -d traitor:latest
+```
 
 ## build with source code
 
-`git  clone https://github.com/KaniuBillows/traitor.git`  
-`cd traitor/src`  
-`go build`  
-`.\traitor`
+```
+git  clone https://github.com/KaniuBillows/traitor.git
+cd traitor/src  
+go build  
+.\traitor
+```
 
 ## startup parameters
 
