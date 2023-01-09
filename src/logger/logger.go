@@ -30,8 +30,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	var path = fmt.Sprintf("%s/.traitor/debug", dir)
-	err = os.MkdirAll(path, os.ModePerm)
+	var path = fmt.Sprintf("%s/.traitor/log", dir)
+	err = os.MkdirAll(path, 0744)
 	if err != nil {
 		panic(err)
 	}
