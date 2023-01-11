@@ -1,22 +1,42 @@
 package http
 
 import (
+	"C"
+	executor "github.com/KaniuBillows/traitor-plugin"
 	"github.com/dop251/goja"
-	"github.com/dop251/goja_nodejs/require"
 	"io"
-	"log"
 	httpclient "net/http"
 )
 
 const ModuleName = "http"
 
-type http struct {
-	runtime *goja.Runtime
+type Http struct {
+	e *executor.Executor
 }
-type Response struct {
+type response struct {
 	Status       string // e.g. "200 OK"
 	StatusCode   int
 	ResponseText string
+}
+type Module struct {
+}
+
+func (m *Module) GetName() string {
+	return ModuleName
+}
+
+func GetModule() executor.AsyncExecutable {
+	return &Module{}
+}
+
+func (m *Module) Require(e *executor.Executor) func(runtime *goja.Runtime, module *goja.Object) {
+	u := Http{
+		e: e,
+	}
+	return func(runtime *goja.Runtime, module *goja.Object) {
+		obj := module.Get("exports").(*goja.Object)
+		obj.Set("get", u.jsGet)
+	}
 }
 
 func Get(url string, successRc chan *httpclient.Response, errRc chan *error) {
@@ -27,7 +47,7 @@ func Get(url string, successRc chan *httpclient.Response, errRc chan *error) {
 	}
 	successRc <- res
 }
-func (u *http) jsGet(call goja.FunctionCall) goja.Value {
+func (u *Http) jsGet(call goja.FunctionCall) goja.Value {
 	var url string
 
 	rc := make(chan *httpclient.Response)
@@ -43,47 +63,36 @@ func (u *http) jsGet(call goja.FunctionCall) goja.Value {
 	if _errCallBack, ok := goja.AssertFunction(call.Argument(2)); ok {
 		errCallBack = _errCallBack
 	}
+
+	u.e.Wait.Add(1)
 	go Get(url, rc, errRc)
 
 	go u.callBack(callBack, errCallBack, rc, errRc)
 	return goja.Undefined()
 }
-
-func Require(runtime *goja.Runtime, module *goja.Object) {
-	u := &http{
-		runtime: runtime,
-	}
-	obj := module.Get("exports").(*goja.Object)
-	obj.Set("get", u.jsGet)
-}
-
-func (u *http) callBack(callback goja.Callable,
+func (u *Http) callBack(callback goja.Callable,
 	errCallBack goja.Callable,
 	rc chan *httpclient.Response, errRc chan *error) {
 	select {
 	case res := <-rc:
 		{
-			defer res.Body.Close()
+			defer func(Body io.ReadCloser) {
+				_ = Body.Close()
+			}(res.Body)
 			body, _ := io.ReadAll(res.Body)
 			str := string(body)
 
-			var rsp = Response{
+			var rsp = response{
 				ResponseText: str,
 				StatusCode:   res.StatusCode,
 				Status:       res.Status,
 			}
-			_, err := callback(goja.Undefined(), u.runtime.ToValue(rsp))
-			if err != nil {
-				log.Fatalln(err.Error())
-			}
+			_, _ = callback(goja.Undefined(), u.e.Vm.ToValue(rsp))
 		}
 	case err := <-errRc:
 		{
-			_, _ = errCallBack(goja.Undefined(), u.runtime.ToValue(err))
+			_, _ = errCallBack(goja.Undefined(), u.e.Vm.ToValue(err))
 		}
 	}
-}
-
-func init() {
-	require.RegisterNativeModule(ModuleName, Require)
+	u.e.Wait.Done()
 }

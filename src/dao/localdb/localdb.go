@@ -144,14 +144,17 @@ func (l *LocalDb) GetJobInfo(jobId string) (model.JobEntity, error) {
 func (l *LocalDb) GetJobScript(jobId string) (model.ScriptEntity, error) {
 	cmd := utils.ToCmdLine("HGET", jobId, model.Script)
 	reply := l.client.Send(cmd)
-	scriptReply, ok := reply.(*protocol.BulkReply)
-	if ok == false {
-		return model.ScriptEntity{}, errors.New("get job script error,script is not exists")
+	var result model.ScriptEntity
+	switch reply.(type) {
+	case *protocol.BulkReply:
+		{
+			result = model.ScriptEntity{
+				JobId:  jobId,
+				Script: string(reply.(*protocol.BulkReply).Arg),
+			}
+		}
 	}
-	result := model.ScriptEntity{
-		JobId:  jobId,
-		Script: string(scriptReply.Arg),
-	}
+
 	return result, nil
 }
 func (l *LocalDb) AddJob(job model.JobEntity) (string, error) {

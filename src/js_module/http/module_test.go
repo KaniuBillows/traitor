@@ -1,37 +1,30 @@
 package http
 
 import (
-	"github.com/dop251/goja"
-	"github.com/dop251/goja_nodejs/console"
-	"github.com/dop251/goja_nodejs/require"
+	"fmt"
+	executor2 "github.com/KaniuBillows/traitor-plugin"
 	"testing"
+	"traitor/js_module"
 )
 
 func TestGet(t *testing.T) {
-	vm := goja.New()
-	registry := require.NewRegistry()
+	var executor = executor2.MakeExecutor()
+	js_module.RegistryAsyncPlugin(GetModule())
+	js_module.LoadModules(executor)
 
-	registry.RegisterNativeModule(ModuleName, Require)
-	registry.RegisterNativeModule(console.ModuleName, console.Require)
-	registry.Enable(vm)
-	console.Enable(vm)
-	//req := registry.Enable(vm)
-	//v, _ := req.Require("node:console")
 	const script = `
-	const http = require("http")
-	var result
-	http.get('https://api.kaniu.pro/ne/search?keyword=%E9%98%BF%E7%89%9B',(e)=>{
-		var obj = JSON.parse(e.ResponseText)
-		console.logger(JSON.stringify(obj[0]))
-		result = obj
-	},(err)=>{})
-	console.log()
-
+	var Http=require('http')
+	
+	Http.get("Http://suggest.taobao.com/sug?code=utf-8&q=商品关键字&callback=cb",()=>{
+  		console.log('hello world')
+	},()=>{
+  		console.log("err")
+	})
 `
-	_, err := vm.RunString(script)
-	//var l = v.(*goja.Object).Get("log")
+	_, err := executor.Vm.RunString(script)
+	executor.Wait.Wait()
 
 	if err != nil {
-		//fmt.Println(l)
+		fmt.Println(err)
 	}
 }

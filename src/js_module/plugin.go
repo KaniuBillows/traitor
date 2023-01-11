@@ -4,7 +4,7 @@ package js_module
 
 import (
 	"fmt"
-	"github.com/dop251/goja"
+	executor "github.com/KaniuBillows/traitor-plugin"
 	"github.com/mitchellh/go-homedir"
 	"os"
 	"path"
@@ -20,15 +20,16 @@ func init() {
 var dir string
 
 func dirInit() {
-	dir, err := homedir.Dir()
+	d, err := homedir.Dir()
 	if err != nil {
 		panic(err)
 	}
-	dir = fmt.Sprintf("%s/.traitor/plugin", dir)
-	err = os.MkdirAll(dir, 0744)
+	d = fmt.Sprintf("%s/.traitor/plugin", d)
+	err = os.MkdirAll(d, 0744)
 	if err != nil {
 		panic(err)
 	}
+	dir = d
 }
 func watchDir() {
 	files, _ := os.ReadDir(dir)
@@ -36,40 +37,32 @@ func watchDir() {
 		if f.IsDir() {
 			continue
 		}
-		if path.Ext(f.Name()) != "so" {
+		name := f.Name()
+		if path.Ext(name) != ".so" {
 			continue
 		}
 
-		p, err := plugin.Open(f.Name())
+		p, err := plugin.Open(dir + "/" + name)
 		if err != nil {
-			logger.Error(fmt.Sprintf("cannot load plugin file:%s", f.Name()))
+			logger.Error(fmt.Sprintf("cannot load plugin file:%s  error:%s", name, err.Error()))
 			continue
 		}
-		loadPlugin(f.Name(), p)
+		loadPlugin(name, p)
 	}
 }
 
 func loadPlugin(moduleName string, p *plugin.Plugin) {
-	nameSymbol, err := p.Lookup("ModuleName")
+	moduleSymbol, err := p.Lookup("GetModule")
 	if err != nil {
 		logger.Error(err)
 		return
 	}
-	name, ok := nameSymbol.(string)
+	moduleFn, ok := moduleSymbol.(func() executor.Executable)
 	if ok == false {
-		logger.Error(fmt.Sprintf("load module error: %s,ModuleName required", moduleName))
+		logger.Error(fmt.Sprintf("load module file error: %s,ModuleName required", moduleName))
 		return
 	}
-	fnSymbol, err := p.Lookup("Require")
-	if err != nil {
-		logger.Error(err)
-		return
-	}
-	fn, ok := fnSymbol.(func(runtime *goja.Runtime, module *goja.Object))
-	if ok == false {
-		logger.Error(fmt.Sprintf("load module error: %s,func 'Require' is required", moduleName))
-		return
-	}
+	module := moduleFn()
 
-	RegistryModule(name, fn)
+	RegistryPlugin(module)
 }

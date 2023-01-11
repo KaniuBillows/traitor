@@ -185,11 +185,7 @@ func (s *server) EditPage(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"err": "not found"})
 		return
 	}
-	sc, err := s.dao.GetJobScript(id)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"err": err.Error()})
-		return
-	}
+	sc, _ := s.dao.GetJobScript(id)
 	c.HTML(http.StatusOK, "edit_script.html", gin.H{
 		"script": sc.Script,
 	})

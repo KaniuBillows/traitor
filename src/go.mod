@@ -3,7 +3,8 @@ module traitor
 go 1.19
 
 require (
-	github.com/dop251/goja v0.0.0-20221118162653-d4bf6fde1b86
+	github.com/KaniuBillows/traitor-plugin v0.0.1-alpha5
+	github.com/dop251/goja v0.0.0-20221229151140-b95230a9dbad
 	github.com/dop251/goja_nodejs v0.0.0-20221211191749-434192f0843e
 	github.com/fatih/structs v1.1.0
 	github.com/gin-gonic/gin v1.8.1

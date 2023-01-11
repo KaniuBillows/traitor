@@ -355,7 +355,7 @@ services:
       ports:
           - "8080:8080"     
       volumes:
-          - "~/node0/.traitor:/root/.traitor"
+          - "~/.traitor/node0:/root/.traitor"
       container_name: "node0"
       depends_on:
           - redis
@@ -368,7 +368,7 @@ services:
       ports:
           - "8081:8080"     
       volumes:
-          - "~/node1/.traitor:/root/.traitor"
+          - "~/.traitor/node1:/root/.traitor"
       container_name: "node1" 
       depends_on:
           - redis

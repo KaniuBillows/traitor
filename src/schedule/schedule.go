@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dop251/goja"
+	executor "github.com/KaniuBillows/traitor-plugin"
 	"github.com/gorhill/cronexpr"
 	"io"
 	"sync"
@@ -39,14 +39,14 @@ type schedule struct {
 func (s *schedule) CreateTask(key string, execType uint8) func() {
 
 	execFunc := func() {
-		vm := goja.New()          // the vm is not concurrent safe.
-		js_module.LoadModules(vm) // native modules support.
+		exec := executor.MakeExecutor()
+		js_module.LoadModules(exec) // native modules support.
 		var sc, err = s.dao.GetJobScript(key)
 		if err != nil {
 			logger.Error(fmt.Sprintf("running Task failed:%s download script error.", key))
 			return
 		}
-		_, err = vm.RunString(sc.Script) // running logic.
+		_, err = exec.Vm.RunString(sc.Script) // running logic.
 		if err != nil {
 			logger.Error(err)
 		}
@@ -55,6 +55,7 @@ func (s *schedule) CreateTask(key string, execType uint8) func() {
 		if err != nil {
 			logger.Error(err)
 		}
+		exec.Wait.Wait()
 	}
 	if execType == model.DelayExecute { // only once for delay.
 		return execFunc
@@ -99,15 +100,16 @@ func (s *schedule) CreateTaskForDebug(key string, writer io.Writer) (func(), *sy
 		defer func() {
 			wt.Done()
 		}()
-		vm := goja.New()
-		js_module.LoadModulesForDebugMode(vm)
-		debug_out.SetIoWriter(vm, writer) // this vm would use this writer.
+
+		exec := executor.MakeExecutor()
+		js_module.LoadModulesForDebugMode(exec)
+		debug_out.SetIoWriter(exec.Vm, writer) // this vm would use this writer.
 		var sc, err = s.dao.GetJobScript(key)
 		if err != nil {
 			logger.Error(fmt.Sprintf("running Task failed:%s download script error.", key))
 			return
 		}
-		_, err = vm.RunString(sc.Script) // running logic.
+		_, err = exec.Vm.RunString(sc.Script) // running logic.
 		if err != nil {
 			errInfo := err.Error()
 			buffer := []byte(errInfo)
@@ -116,6 +118,7 @@ func (s *schedule) CreateTaskForDebug(key string, writer io.Writer) (func(), *sy
 				logger.Error(err)
 			}
 		}
+		exec.Wait.Wait()
 	}, &wt
 }
 
