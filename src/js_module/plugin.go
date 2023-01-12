@@ -57,12 +57,19 @@ func loadPlugin(moduleName string, p *plugin.Plugin) {
 		logger.Error(err)
 		return
 	}
-	moduleFn, ok := moduleSymbol.(func() executor.Executable)
-	if ok == false {
-		logger.Error(fmt.Sprintf("load module file error: %s,ModuleName required", moduleName))
+	switch moduleSymbol.(type) {
+	case func() executor.Executable:
+		{
+			module := moduleSymbol.(func() executor.Executable)
+			RegistryPlugin(module())
+		}
+	case func() executor.AsyncExecutable:
+		{
+			module := moduleSymbol.(func() executor.AsyncExecutable)
+			RegistryAsyncPlugin(module())
+		}
+	default:
+		logger.Error(fmt.Sprintf("load module file error: %s,Module not implemation AsyncExecutable or Executable", moduleName))
 		return
 	}
-	module := moduleFn()
-
-	RegistryPlugin(module)
 }
