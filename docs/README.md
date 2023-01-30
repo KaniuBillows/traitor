@@ -590,3 +590,33 @@ var http=require('http')
 ```
 
 you will get `heelo world` output.
+
+In this example,you will notice that `http.get()`method is an async function,
+it doesn't block the execution and runtime will wait until all async tasks are finished.
+
+Go back to the plugin code:  
+in `traitor-plugin` package,there are two interfaces:`Executable` and `AsyncExecutable`.
+The http plugin needs to be executed asynchronously and vm will sync the waiting state by `sync.WaitGroup`.
+
+But simple sync plugin is much easier,just impl `Executable`.
+
+`GetName()` method declare how to require your plugin ,its return value would be
+used as `var plugin = require('pluginName')` in javaScript.
+
+`ModuleLoader` is used for set which native method will be called when running
+and set the js function name.   
+For this code:
+
+```
+func (m *Module) ModuleLoader(runtime *goja.Runtime, module *goja.Object) {
+    m.vm = runtime
+    obj := module.Get("exports").(*goja.Object)
+    obj.Set("get", m.jsGet)
+    }
+}
+```
+
+the javaScript function name is `get`,and when it is called,the golang method `m.jsGet`
+will be executed.
+
+Plugin is based on Golang plugin, it only supports Linux,FreeBsd,macOS.
