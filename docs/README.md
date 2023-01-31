@@ -5,7 +5,7 @@ Traitor is a distributed Timing Task Service.
 It based on Golang but the tasks are described with JavaScript.
 
 Users could use Web API to manage Timing work or Delay job.
-It supported Dynamically add scheduled tasks without
+It supported dynamically add scheduled tasks without
 republishing the program.
 
 Besides,we provide a WebSite that you can manage tasks with UI.
@@ -27,7 +27,6 @@ you should have environment: Go 1.19
 git  clone https://github.com/KaniuBillows/traitor.git  
 cd traitor/src  
 go build  
-.\traitor #start the service.
 ```
 
 you can also use docker-compose:
@@ -64,6 +63,14 @@ and would not be scheduled.
 
 required **query** param:  
 `type:"timing" or "delay"` not case sensitive
+
+the body allows these fields as follows:
+
+- `name`
+- `cron` set the cron expression.Effective for timing job
+- `description`
+- `execAt` effective for delay job,it's timeStamp
+- `script`
 
 body example **timing task**:  
 required body param:`cron`  
@@ -111,13 +118,6 @@ required **query** param:
 `id:`  
 just put the value that [Create](#Create-a-Job) returned.
 
-the body allows these fields as follows:
-
-- `name`
-- `cron` set the cron expression.Effective for timing job
-- `description`
-- `execAt` effective for delay job,it's timeStamp
-- `script`
 
 **enable is true**:   
 server would judge whether the operating conditions are met.
