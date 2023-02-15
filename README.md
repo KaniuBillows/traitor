@@ -1,7 +1,14 @@
 # Traitor
 
+Traitor is a distributed Timing Task Service.
 
-[Document](https://kaniubillows.github.io/traitor/#/)  
+It based on Golang but the tasks are described with JavaScript.
+
+Users could use Web API to manage Timing work or Delay job. It supported dynamically add scheduled tasks without republishing the program.
+
+# Document
+[Document](https://kaniubillows.github.io/traitor/#/) 
+
 [中文文档](https://kaniubillows.github.io/traitor/#/zh-cn/)
 
 # Quick Start
